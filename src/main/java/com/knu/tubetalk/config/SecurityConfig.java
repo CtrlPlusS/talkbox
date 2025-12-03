@@ -36,6 +36,7 @@ public class SecurityConfig {
                         .requestMatchers("/search/**").permitAll()
                         .requestMatchers("/thread/**", "/guestbook/**").permitAll()
                         .requestMatchers("/api/comments/thread/**", "/api/comments/guestbook/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/comments/*/replies").permitAll()
                         .requestMatchers(HttpMethod.POST, "/join").permitAll()
                         .requestMatchers("/login", "/join").permitAll()
                         .requestMatchers("/css/**", "/js/**", "/images/**").permitAll()

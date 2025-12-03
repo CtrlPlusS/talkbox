@@ -5,6 +5,7 @@ import java.time.LocalDateTime;
 public class UserComment {
     private String commentId;
     private String userId;
+    private String loginId;  // 로그인 ID (닉네임으로 표시)
     private String threadId;
     private String guestbookId;
     private String content;
@@ -28,12 +29,30 @@ public class UserComment {
         this.likeCount = likeCount;
         this.dislikeCount = dislikeCount;
     }
+    
+    public UserComment(String commentId, String userId, String loginId, String threadId, String guestbookId,
+                       String content, LocalDateTime createdAt, LocalDateTime updatedAt,
+                       long likeCount, long dislikeCount) {
+        this.commentId = commentId;
+        this.userId = userId;
+        this.loginId = loginId;
+        this.threadId = threadId;
+        this.guestbookId = guestbookId;
+        this.content = content;
+        this.createdAt = createdAt;
+        this.updatedAt = updatedAt;
+        this.likeCount = likeCount;
+        this.dislikeCount = dislikeCount;
+    }
 
     public String getCommentId() { return commentId; }
     public void setCommentId(String commentId) { this.commentId = commentId; }
 
     public String getUserId() { return userId; }
     public void setUserId(String userId) { this.userId = userId; }
+    
+    public String getLoginId() { return loginId; }
+    public void setLoginId(String loginId) { this.loginId = loginId; }
 
     public String getThreadId() { return threadId; }
     public void setThreadId(String threadId) { this.threadId = threadId; }

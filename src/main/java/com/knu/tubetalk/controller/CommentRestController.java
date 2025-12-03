@@ -1,8 +1,10 @@
 package com.knu.tubetalk.controller;
 
+import com.knu.tubetalk.domain.Reply;
 import com.knu.tubetalk.domain.User;
 import com.knu.tubetalk.domain.UserComment;
 import com.knu.tubetalk.service.CommentService;
+import com.knu.tubetalk.service.ReplyService;
 import com.knu.tubetalk.service.UserService;
 
 import org.springframework.http.HttpStatus;
@@ -12,6 +14,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.sql.SQLException;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
@@ -22,10 +25,12 @@ public class CommentRestController {
 
     private final CommentService commentService;
     private final UserService userService;
+    private final ReplyService replyService;
 
-    public CommentRestController(CommentService commentService, UserService userService) {
+    public CommentRestController(CommentService commentService, UserService userService, ReplyService replyService) {
         this.commentService = commentService;
         this.userService = userService;
+        this.replyService = replyService;
     }
 
     @GetMapping("/thread/{threadId}")
@@ -143,10 +148,37 @@ public class CommentRestController {
     @PutMapping("/{commentId}")
     public ResponseEntity<String> updateComment(
             @PathVariable String commentId,
-            @RequestBody UserComment updateData) {
+            @RequestBody Map<String, String> requestData) {
         try {
-            // TODO: 작성자만 수정 가능하도록 권한 체크 필요
-            commentService.updateComment(commentId, updateData.getContent(), updateData.getUpdatedAt());
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            
+            if (authentication == null || !authentication.isAuthenticated() || "anonymousUser".equals(authentication.getName())) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("로그인이 필요합니다.");
+            }
+            
+            // 댓글 조회
+            UserComment comment = commentService.getComment(commentId);
+            if (comment == null) {
+                return ResponseEntity.notFound().build();
+            }
+            
+            // 작성자 확인
+            String loginId = authentication.getName();
+            User currentUser = userService.loadUserByLoginId(loginId);
+            if (currentUser == null) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("존재하지 않는 사용자입니다.");
+            }
+            
+            if (!comment.getUserId().equals(currentUser.getUserId())) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body("본인의 댓글만 수정할 수 있습니다.");
+            }
+            
+            String content = requestData.get("content");
+            if (content == null || content.trim().isEmpty()) {
+                return ResponseEntity.badRequest().body("댓글 내용이 비어있습니다.");
+            }
+            
+            commentService.updateComment(commentId, content, LocalDateTime.now());
             return ResponseEntity.ok("댓글이 수정되었습니다.");
         } catch (SQLException e) {
             e.printStackTrace();
@@ -157,12 +189,151 @@ public class CommentRestController {
     @DeleteMapping("/{commentId}")
     public ResponseEntity<String> deleteComment(@PathVariable String commentId) {
         try {
-            // TODO: 작성자만 삭제 가능하도록 권한 체크 필요
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            
+            if (authentication == null || !authentication.isAuthenticated() || "anonymousUser".equals(authentication.getName())) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("로그인이 필요합니다.");
+            }
+            
+            // 댓글 조회
+            UserComment comment = commentService.getComment(commentId);
+            if (comment == null) {
+                return ResponseEntity.notFound().build();
+            }
+            
+            // 작성자 확인
+            String loginId = authentication.getName();
+            User currentUser = userService.loadUserByLoginId(loginId);
+            if (currentUser == null) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("존재하지 않는 사용자입니다.");
+            }
+            
+            if (!comment.getUserId().equals(currentUser.getUserId())) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body("본인의 댓글만 삭제할 수 있습니다.");
+            }
+            
             commentService.deleteComment(commentId);
             return ResponseEntity.ok("댓글이 삭제되었습니다.");
         } catch (SQLException e) {
             e.printStackTrace();
             return ResponseEntity.internalServerError().body("댓글 삭제에 실패했습니다.");
+        }
+    }
+
+    // ========== 대댓글(Reply) API ==========
+    
+    @GetMapping("/{commentId}/replies")
+    public ResponseEntity<List<Reply>> getRepliesByComment(@PathVariable String commentId) {
+        try {
+            return ResponseEntity.ok(replyService.getRepliesByCommentId(commentId));
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
+    @PostMapping("/{commentId}/replies")
+    public ResponseEntity<String> addReply(
+            @PathVariable String commentId,
+            @RequestBody Map<String, String> requestData) {
+        try {
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            
+            if (authentication == null || !authentication.isAuthenticated() || "anonymousUser".equals(authentication.getName())) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("로그인이 필요합니다.");
+            }
+            
+            String loginId = authentication.getName();
+            User user = userService.loadUserByLoginId(loginId);
+            if (user == null) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("존재하지 않는 사용자입니다.");
+            }
+            
+            String content = requestData.get("content");
+            if (content == null || content.trim().isEmpty()) {
+                return ResponseEntity.badRequest().body("대댓글 내용이 비어있습니다.");
+            }
+            
+            Reply reply = new Reply();
+            reply.setUserId(user.getUserId());
+            reply.setContent(content.trim());
+            
+            replyService.addReply(commentId, reply);
+            return ResponseEntity.ok("대댓글이 등록되었습니다.");
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return ResponseEntity.internalServerError().body("대댓글 등록에 실패했습니다.");
+        }
+    }
+
+    @PutMapping("/replies/{replyId}")
+    public ResponseEntity<String> updateReply(
+            @PathVariable String replyId,
+            @RequestBody Map<String, String> requestData) {
+        try {
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            
+            if (authentication == null || !authentication.isAuthenticated() || "anonymousUser".equals(authentication.getName())) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("로그인이 필요합니다.");
+            }
+            
+            Reply reply = replyService.getReply(replyId);
+            if (reply == null) {
+                return ResponseEntity.notFound().build();
+            }
+            
+            String loginId = authentication.getName();
+            User currentUser = userService.loadUserByLoginId(loginId);
+            if (currentUser == null) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("존재하지 않는 사용자입니다.");
+            }
+            
+            if (!reply.getUserId().equals(currentUser.getUserId())) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body("본인의 대댓글만 수정할 수 있습니다.");
+            }
+            
+            String content = requestData.get("content");
+            if (content == null || content.trim().isEmpty()) {
+                return ResponseEntity.badRequest().body("대댓글 내용이 비어있습니다.");
+            }
+            
+            replyService.updateReply(replyId, content, LocalDateTime.now());
+            return ResponseEntity.ok("대댓글이 수정되었습니다.");
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return ResponseEntity.internalServerError().body("대댓글 수정에 실패했습니다.");
+        }
+    }
+
+    @DeleteMapping("/replies/{replyId}")
+    public ResponseEntity<String> deleteReply(@PathVariable String replyId) {
+        try {
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            
+            if (authentication == null || !authentication.isAuthenticated() || "anonymousUser".equals(authentication.getName())) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("로그인이 필요합니다.");
+            }
+            
+            Reply reply = replyService.getReply(replyId);
+            if (reply == null) {
+                return ResponseEntity.notFound().build();
+            }
+            
+            String loginId = authentication.getName();
+            User currentUser = userService.loadUserByLoginId(loginId);
+            if (currentUser == null) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("존재하지 않는 사용자입니다.");
+            }
+            
+            if (!reply.getUserId().equals(currentUser.getUserId())) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body("본인의 대댓글만 삭제할 수 있습니다.");
+            }
+            
+            replyService.deleteReply(replyId);
+            return ResponseEntity.ok("대댓글이 삭제되었습니다.");
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return ResponseEntity.internalServerError().body("대댓글 삭제에 실패했습니다.");
         }
     }
 }

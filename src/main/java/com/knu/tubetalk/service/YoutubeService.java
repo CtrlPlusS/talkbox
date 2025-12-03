@@ -51,8 +51,11 @@ public class YoutubeService {
 
             return new VideoAndChannel(video, channel);
 
+        } catch (YoutubeApiException e) {
+            throw e;
         } catch (Exception e) {
-            throw new YoutubeApiException("존재하지 않는 비디오 ID입니다: " + videoId);
+            e.printStackTrace();
+            throw new YoutubeApiException("존재하지 않는 비디오 ID입니다: " + videoId + " - " + e.getMessage());
         }
     }
 

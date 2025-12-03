@@ -6,6 +6,7 @@ public class Reply {
     private String replyId;
     private String commentId;
     private String userId;
+    private String loginId;  // 로그인 ID (닉네임으로 표시)
     private String content;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
@@ -26,6 +27,20 @@ public class Reply {
         this.likeCount = likeCount;
         this.dislikeCount = dislikeCount;
     }
+    
+    public Reply(String replyId, String commentId, String userId, String loginId, String content,
+                 LocalDateTime createdAt, LocalDateTime updatedAt,
+                 long likeCount, long dislikeCount) {
+        this.replyId = replyId;
+        this.commentId = commentId;
+        this.userId = userId;
+        this.loginId = loginId;
+        this.content = content;
+        this.createdAt = createdAt;
+        this.updatedAt = updatedAt;
+        this.likeCount = likeCount;
+        this.dislikeCount = dislikeCount;
+    }
 
     public String getReplyId() { return replyId; }
     public void setReplyId(String replyId) { this.replyId = replyId; }
@@ -35,6 +50,9 @@ public class Reply {
 
     public String getUserId() { return userId; }
     public void setUserId(String userId) { this.userId = userId; }
+    
+    public String getLoginId() { return loginId; }
+    public void setLoginId(String loginId) { this.loginId = loginId; }
 
     public String getContent() { return content; }
     public void setContent(String content) { this.content = content; }

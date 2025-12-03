@@ -44,9 +44,11 @@ public class ReplyDao {
     }
 
     public Optional<Reply> findById(String replyId) throws SQLException {
-        String sql = "SELECT Reply_id, Comment_id, User_id, Content, " +
-                "Created_at, Updated_at, Like_count, Dislike_count " +
-                "FROM REPLY WHERE Reply_id = ?";
+        String sql = "SELECT r.Reply_id, r.Comment_id, r.User_id, u.Login_id, r.Content, " +
+                "r.Created_at, r.Updated_at, r.Like_count, r.Dislike_count " +
+                "FROM REPLY r " +
+                "INNER JOIN APP_USER u ON r.User_id = u.User_id " +
+                "WHERE r.Reply_id = ?";
         try (Connection conn = dataSource.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
 
@@ -54,7 +56,7 @@ public class ReplyDao {
 
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
-                    Reply reply = mapRow(rs);
+                    Reply reply = mapRowWithLoginId(rs);
                     return Optional.of(reply);
                 }
                 return Optional.empty();
@@ -63,9 +65,11 @@ public class ReplyDao {
     }
 
     public List<Reply> findByCommentId(String commentId) throws SQLException {
-        String sql = "SELECT Reply_id, Comment_id, User_id, Content, " +
-                "Created_at, Updated_at, Like_count, Dislike_count " +
-                "FROM REPLY WHERE Comment_id = ? ORDER BY Created_at ASC";
+        String sql = "SELECT r.Reply_id, r.Comment_id, r.User_id, u.Login_id, r.Content, " +
+                "r.Created_at, r.Updated_at, r.Like_count, r.Dislike_count " +
+                "FROM REPLY r " +
+                "INNER JOIN APP_USER u ON r.User_id = u.User_id " +
+                "WHERE r.Comment_id = ? ORDER BY r.Created_at ASC";
         List<Reply> result = new ArrayList<>();
 
         try (Connection conn = dataSource.getConnection();
@@ -75,7 +79,7 @@ public class ReplyDao {
 
             try (ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {
-                    result.add(mapRow(rs));
+                    result.add(mapRowWithLoginId(rs));
                 }
             }
         }
@@ -110,6 +114,22 @@ public class ReplyDao {
                 rs.getString("Reply_id"),
                 rs.getString("Comment_id"),
                 rs.getString("User_id"),
+                rs.getString("Content"),
+                rs.getTimestamp("Created_at").toLocalDateTime(),
+                rs.getTimestamp("Updated_at") != null
+                        ? rs.getTimestamp("Updated_at").toLocalDateTime()
+                        : null,
+                rs.getLong("Like_count"),
+                rs.getLong("Dislike_count")
+        );
+    }
+    
+    private Reply mapRowWithLoginId(ResultSet rs) throws SQLException {
+        return new Reply(
+                rs.getString("Reply_id"),
+                rs.getString("Comment_id"),
+                rs.getString("User_id"),
+                rs.getString("Login_id"),
                 rs.getString("Content"),
                 rs.getTimestamp("Created_at").toLocalDateTime(),
                 rs.getTimestamp("Updated_at") != null

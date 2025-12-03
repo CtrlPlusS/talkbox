@@ -29,11 +29,14 @@ public class ThreadController {
 
             return "thread";
         } catch (YoutubeApiException e) {
-            model.addAttribute("errorMessage", "존재하지 않는 비디오 ID입니다: " + videoId);
-            return "redirect:/main";
+            e.printStackTrace();
+            return "redirect:/main?error=invalid_video";
         } catch (SQLException e) {
-            model.addAttribute("errorMessage", "데이터베이스 오류가 발생했습니다.");
-            return "error";
+            e.printStackTrace();
+            return "redirect:/main?error=db_error";
+        } catch (Exception e) {
+            e.printStackTrace();
+            return "redirect:/main?error=unknown";
         }
     }
 }

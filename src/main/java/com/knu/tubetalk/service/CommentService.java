@@ -60,6 +60,9 @@ public class CommentService {
 
     @Transactional
     public void updateComment(String commentId, String content, LocalDateTime updatedAt) throws SQLException {
+        if (updatedAt == null) {
+            updatedAt = LocalDateTime.now();
+        }
         Timestamp ts = Timestamp.valueOf(updatedAt);
         userCommentDao.updateContent(commentId, content, ts);
     }

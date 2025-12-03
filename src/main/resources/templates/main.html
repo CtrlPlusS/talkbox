@@ -25,6 +25,16 @@
 <div style="display:flex; flex-direction:column; align-items:center; margin-top:150px;">
 
     <h2>Search</h2>
+    
+    <!-- 에러 메시지 표시 -->
+    <div th:if="${errorMessage}" style="color:red; margin-bottom:20px; padding:10px; border:1px solid red; border-radius:5px; max-width:500px; text-align:center;">
+        <span th:text="${errorMessage}"></span>
+    </div>
+    <div th:if="${param.error}" style="color:red; margin-bottom:20px; padding:10px; border:1px solid red; border-radius:5px; max-width:500px; text-align:center;">
+        <span th:if="${param.error == 'invalid_video'}">존재하지 않는 비디오 ID입니다.</span>
+        <span th:if="${param.error == 'db_error'}">데이터베이스 오류가 발생했습니다.</span>
+        <span th:if="${param.error == 'unknown'}">오류가 발생했습니다. 다시 시도해주세요.</span>
+    </div>
 
     <input id="searchInput"
            type="text"

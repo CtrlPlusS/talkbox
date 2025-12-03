@@ -64,9 +64,11 @@ public class UserCommentDao {
     }
 
     public List<UserComment> findByThreadId(String threadId) throws SQLException {
-        String sql = "SELECT Comment_id, User_id, Thread_id, Guestbook_id, Content, " +
-                "Created_at, Updated_at, Like_count, Dislike_count " +
-                "FROM USER_COMMENT WHERE Thread_id = ? ORDER BY Created_at ASC";
+        String sql = "SELECT uc.Comment_id, uc.User_id, u.Login_id, uc.Thread_id, uc.Guestbook_id, uc.Content, " +
+                "uc.Created_at, uc.Updated_at, uc.Like_count, uc.Dislike_count " +
+                "FROM USER_COMMENT uc " +
+                "INNER JOIN APP_USER u ON uc.User_id = u.User_id " +
+                "WHERE uc.Thread_id = ? ORDER BY uc.Created_at ASC";
         List<UserComment> result = new ArrayList<>();
 
         try (Connection conn = dataSource.getConnection();
@@ -76,7 +78,7 @@ public class UserCommentDao {
 
             try (ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {
-                    result.add(mapRow(rs));
+                    result.add(mapRowWithLoginId(rs));
                 }
             }
         }
@@ -84,9 +86,11 @@ public class UserCommentDao {
     }
 
     public List<UserComment> findByGuestbookId(String guestbookId) throws SQLException {
-        String sql = "SELECT Comment_id, User_id, Thread_id, Guestbook_id, Content, " +
-                "Created_at, Updated_at, Like_count, Dislike_count " +
-                "FROM USER_COMMENT WHERE Guestbook_id = ? ORDER BY Created_at ASC";
+        String sql = "SELECT uc.Comment_id, uc.User_id, u.Login_id, uc.Thread_id, uc.Guestbook_id, uc.Content, " +
+                "uc.Created_at, uc.Updated_at, uc.Like_count, uc.Dislike_count " +
+                "FROM USER_COMMENT uc " +
+                "INNER JOIN APP_USER u ON uc.User_id = u.User_id " +
+                "WHERE uc.Guestbook_id = ? ORDER BY uc.Created_at ASC";
         List<UserComment> result = new ArrayList<>();
 
         try (Connection conn = dataSource.getConnection();
@@ -96,7 +100,7 @@ public class UserCommentDao {
 
             try (ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {
-                    result.add(mapRow(rs));
+                    result.add(mapRowWithLoginId(rs));
                 }
             }
         }
@@ -130,6 +134,23 @@ public class UserCommentDao {
         return new UserComment(
                 rs.getString("Comment_id"),
                 rs.getString("User_id"),
+                rs.getString("Thread_id"),
+                rs.getString("Guestbook_id"),
+                rs.getString("Content"),
+                rs.getTimestamp("Created_at").toLocalDateTime(),
+                rs.getTimestamp("Updated_at") != null
+                        ? rs.getTimestamp("Updated_at").toLocalDateTime()
+                        : null,
+                rs.getLong("Like_count"),
+                rs.getLong("Dislike_count")
+        );
+    }
+    
+    private UserComment mapRowWithLoginId(ResultSet rs) throws SQLException {
+        return new UserComment(
+                rs.getString("Comment_id"),
+                rs.getString("User_id"),
+                rs.getString("Login_id"),
                 rs.getString("Thread_id"),
                 rs.getString("Guestbook_id"),
                 rs.getString("Content"),
