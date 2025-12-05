@@ -2,6 +2,8 @@ package com.knu.tubetalk.service;
 
 import com.knu.tubetalk.dao.UserCommentDao;
 import com.knu.tubetalk.domain.UserComment;
+import com.knu.tubetalk.dto.CommentView;
+import com.knu.tubetalk.dto.PageResponse;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,8 +23,16 @@ public class CommentService {
         this.userCommentDao = userCommentDao;
     }
 
-    public List<UserComment> getCommentsByThread(String threadId) throws SQLException {
-        return userCommentDao.findByThreadId(threadId);
+    public PageResponse<CommentView> getCommentsWithReplies(String threadId, int page, int size) throws SQLException {
+        
+        long totalElements = userCommentDao.countAllByThreadId(threadId);
+        int totalPages = (int) Math.ceil((double) totalElements / size);
+        
+        // 3. 현재 페이지에 해당하는 데이터 조회 (50개)
+        List<CommentView> content = userCommentDao.findCommentsWithReplies(threadId, page, size);
+        
+        // 4. 상자에 담아서 리턴
+        return new PageResponse<>(content, page, totalPages, totalElements);
     }
 
     public List<UserComment> getCommentsByGuestbook(String guestbookId) throws SQLException {

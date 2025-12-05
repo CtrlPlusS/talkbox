@@ -14,7 +14,7 @@
 </head>
 <body>
 
-    <h1 th:text="${owner.loginId} + '님의 방명록'"></h1>
+    <h1 th:text="${owner.loginId} + '님의 개인 페이지'"></h1>
     <hr>
 
     <h3>남겨진 글들</h3>
@@ -36,6 +36,7 @@
     </div>
     
     <a href="/main">메인으로 가기</a>
+    <a href="/userInfoChange">회원정보 수정</a>
 
     <script th:inline="javascript">
         /*<![CDATA[*/

@@ -10,16 +10,43 @@
         .video-info { margin-bottom: 30px; }
         .video-title { font-size: 24px; font-weight: bold; margin-bottom: 10px; }
         .video-stats { color: #666; }
+        
         .comments-container { border-top: 1px solid #ddd; padding-top: 20px; }
         .comment-list { min-height: 200px; }
         .comment-item { padding: 15px 0; border-bottom: 1px solid #eee; }
+        .reply-item { 
+            padding: 10px 0; 
+            margin-left: 40px; 
+            border-bottom: 1px solid #f9f9f9; 
+            background-color: #fafafa;
+            border-radius: 5px;
+            padding-left: 10px;
+        }
         .comment-count { color: #ff0000; font-weight: bold; }
-        .loading { color: #999; text-align: center; padding: 40px; }
-        .reply-section { margin-left: 30px; margin-top: 10px; padding-left: 15px; border-left: 2px solid #ddd; min-height: 20px; }
-        .reply-item { padding: 8px 0; font-size: 14px; border-bottom: 1px solid #f0f0f0; }
-        .reply-item:last-child { border-bottom: none; }
-        .reply-form { margin-top: 10px; display: none; }
+        
+        .reply-form { margin-top: 10px; display: none; margin-left: 40px; }
         .reply-form.active { display: block; }
+
+        /* 페이지네이션 스타일 */
+        .pagination {
+            display: flex;
+            justify-content: center;
+            margin-top: 20px;
+            gap: 5px;
+        }
+        .page-btn {
+            border: 1px solid #ddd;
+            background-color: white;
+            padding: 5px 10px;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+        .page-btn:hover { background-color: #f0f0f0; }
+        .page-btn.active {
+            background-color: #ff0000; /* 유튜브 레드 */
+            color: white;
+            border-color: #ff0000;
+        }
     </style>
 </head>
 <body>
@@ -41,335 +68,228 @@
                 싫어요: <span th:text="${video.dislikeCount}"></span> | 
                 댓글 수: <span class="comment-count" th:text="${video.commentCount}">0</span>
             </div>
-            <div th:if="${thread}">
-                스레드 생성일: <span th:text="${thread.createdAt}"></span> | 
-                참여자 수: <span th:text="${thread.participantCount}">0</span>
-            </div>
-            
-            <!-- YouTube 영상 임베드 -->
             <div style="position:relative; padding-bottom:56.25%; height:0; overflow:hidden; max-width:100%; margin-top:20px;">
-                <iframe 
-                    th:src="'https://www.youtube.com/embed/' + ${video.videoId}"
-                    style="position:absolute; top:0; left:0; width:100%; height:100%; border:0;"
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                    allowfullscreen>
-                </iframe>
+                <iframe th:src="'https://www.youtube.com/embed/' + ${video.videoId}" style="position:absolute; top:0; left:0; width:100%; height:100%; border:0;" allowfullscreen></iframe>
             </div>
         </div>
 
         <!-- 댓글 영역 -->
         <div class="comments-container">
-            <h3>댓글 <span id="commentCount" class="comment-count">0</span></h3>
+            <h3>댓글</h3>
+            
+            <!-- 페이지 이동용 입력창 -->
+            <div style="margin-bottom: 10px; text-align: right;">
+                <input type="number" id="pageInput" placeholder="페이지" style="width: 50px;" min="1">
+                <button onclick="goToInputPage()">이동</button>
+            </div>
+
             <div id="commentList" class="comment-list">
                 <div class="loading">댓글을 불러오는 중...</div>
             </div>
             
-            <!-- 댓글 작성 폼 추가 -->
-      <div sec:authorize="isAuthenticated()" style="margin-top:20px;">
-        <textarea id="commentInput" placeholder="댓글을 작성하세요" style="width:100%; height:80px;"></textarea>
-        <button id="submitComment" style="margin-top:5px;">댓글 등록</button>
-      </div>
-      <div sec:authorize="isAnonymous()" style="margin-top:20px; color:#666;">
-        댓글을 작성하려면 <a href="/login">로그인</a>이 필요합니다.
-      </div>
+            <!-- 페이지네이션 버튼 영역 -->
+            <div id="pagination" class="pagination"></div>
+            
+            <!-- 댓글 작성 폼 -->
+            <div sec:authorize="isAuthenticated()" style="margin-top:20px;">
+                <textarea id="commentInput" placeholder="댓글을 작성하세요" style="width:100%; height:80px;"></textarea>
+                <button id="submitComment" style="margin-top:5px;">댓글 등록</button>
+            </div>
+            <div sec:authorize="isAnonymous()" style="margin-top:20px; color:#666;">
+                댓글을 작성하려면 <a href="/login">로그인</a>이 필요합니다.
+            </div>
+        </div>
     </div>
-  </div>
 
-     <script th:inline="javascript">
+    <script th:inline="javascript">
     /*<![CDATA[*/
     const videoId = /*[[${video.videoId}]]*/ '';
     const apiBase = '/api/comments/thread/' + videoId;
     const currentLoginId = /*[[${#authentication?.name}]]*/ null;
 
+    let currentPage = 1;
+    let totalPages = 1;
+
     window.onload = function() {
-      loadComments();
+        loadComments(1);
 
-      // 댓글 등록 버튼 클릭 핸들러
-      document.getElementById('submitComment').onclick = async function() {
-        const content = document.getElementById('commentInput').value.trim();
-        if (!content) {
-          alert('댓글 내용을 입력해주세요.');
-          return;
-        }
-
-        try {
-          await axios.post(apiBase, {
-            content: content
-          });
-          alert('댓글이 등록되었습니다.');
-          document.getElementById('commentInput').value = ''; // 입력창 초기화
-          loadComments(); // 댓글 목록 갱신
-        } catch (error) {
-          console.error('댓글 등록 실패:', error);
-          alert('댓글 등록에 실패했습니다.');
-        }
-      };
+        document.getElementById('submitComment').onclick = async function() {
+            const content = document.getElementById('commentInput').value.trim();
+            if (!content) { alert('내용을 입력해주세요.'); return; }
+            try {
+                await axios.post(apiBase, { content: content });
+                alert('등록되었습니다.');
+                document.getElementById('commentInput').value = '';
+                loadComments(1); // 등록 후 첫 페이지로 이동
+            } catch (error) {
+                alert('등록 실패');
+            }
+        };
     };
 
-    async function loadComments() {
-      try {
-        const response = await axios.get(apiBase);
-        const comments = response.data;
-        displayComments(comments);
-        document.getElementById('commentCount').textContent = comments.length;
-      } catch (error) {
-        console.error('댓글 로드 실패:', error);
-        document.getElementById('commentList').innerHTML =
-          '<div style="color:red; text-align:center;">댓글을 불러올 수 없습니다.</div>';
-      }
+    function goToInputPage() {
+        const inputVal = document.getElementById('pageInput').value;
+        const page = parseInt(inputVal);
+        if (page >= 1 && page <= totalPages) {
+            loadComments(page);
+        } else {
+            alert('유효하지 않은 페이지입니다. (1 ~ ' + totalPages + ')');
+        }
     }
 
-    async function displayComments(comments) {
-      const container = document.getElementById('commentList');
-      if (comments.length === 0) {
-        container.innerHTML = '<div style="color:#999; text-align:center;">아직 댓글이 없습니다.</div>';
-        return;
-      }
-      
-      container.innerHTML = '';
-      
-      for (const comment of comments) {
-        const commentDiv = document.createElement('div');
-        commentDiv.className = 'comment-item';
-        commentDiv.id = `comment-${comment.commentId}`;
-        
-        const isOwner = currentLoginId && comment.loginId === currentLoginId;
-        
-        let html = `
-          <strong>${escapeHtml(comment.loginId || comment.userId)}</strong>
-          <small style="color:#999;">${new Date(comment.createdAt).toLocaleString('ko-KR')}</small>
-        `;
-        
-        if (isOwner) {
-          html += `
-            <button onclick="editComment('${comment.commentId}')" style="margin-left:10px; font-size:12px;">수정</button>
-            <button onclick="deleteComment('${comment.commentId}')" style="margin-left:5px; font-size:12px;">삭제</button>
-          `;
+    // ★ 수정된 loadComments 함수
+    async function loadComments(page) {
+        try {
+            const response = await axios.get(apiBase, { params: { page: page } });
+            
+            // ★ 중요: PageResponse 객체에서 내용물(content) 꺼내기
+            const data = response.data;
+            const items = data.content; 
+            
+            // 페이지 정보 업데이트
+            currentPage = data.currentPage;
+            totalPages = data.totalPages;
+            
+            displayItems(items);
+            renderPagination(currentPage, totalPages);
+            
+        } catch (error) {
+            console.error('댓글 로드 실패:', error); // printStackTrace() 대신 console.error 사용
+            document.getElementById('commentList').innerHTML = '<div style="color:red; text-align:center;">댓글을 불러오지 못했습니다.</div>';
         }
-        
-        html += `
-          <div id="comment-content-${comment.commentId}">
-            <p>${escapeHtml(comment.content)}</p>
-          </div>
-          <div style="font-size:12px; color:#666;">
-            좋아요: ${comment.likeCount} | 싫어요: ${comment.dislikeCount}
-            ${currentLoginId ? `<button onclick="toggleReplyForm('${comment.commentId}')" style="margin-left:10px; font-size:12px;">답글</button>` : ''}
-          </div>
-          <div class="reply-section" id="replies-${comment.commentId}">
-            <div class="loading" style="padding:10px; font-size:12px;">답글 로딩 중...</div>
-          </div>
-          ${currentLoginId ? `
-            <div class="reply-form" id="reply-form-${comment.commentId}">
-              <textarea id="reply-input-${comment.commentId}" placeholder="답글을 작성하세요" style="width:100%; height:60px; margin-top:5px;"></textarea>
-              <button onclick="submitReply('${comment.commentId}')" style="margin-top:5px; font-size:12px;">답글 등록</button>
-              <button onclick="toggleReplyForm('${comment.commentId}')" style="margin-left:5px; font-size:12px;">취소</button>
-            </div>
-          ` : ''}
-        `;
-        
-        commentDiv.innerHTML = html;
-        container.appendChild(commentDiv);
-        
-        // 수정 버튼에 현재 내용 저장
-        if (isOwner) {
-          const editBtn = commentDiv.querySelector(`button[onclick*="editComment('${comment.commentId}')"]`);
-          if (editBtn) {
-            editBtn.dataset.content = comment.content;
-          }
-        }
-        
-        // 대댓글 로드
-        await loadReplies(comment.commentId);
-      }
     }
-    
-    async function loadReplies(commentId) {
-      const replySection = document.getElementById(`replies-${commentId}`);
-      if (!replySection) {
-        return;
-      }
-      
-      try {
-        const response = await axios.get(`/api/comments/${commentId}/replies`);
-        const replies = response.data || [];
-        displayReplies(commentId, replies);
-      } catch (error) {
-        replySection.innerHTML = '';
-      }
-    }
-    
-    function displayReplies(commentId, replies) {
-      const replySection = document.getElementById(`replies-${commentId}`);
-      if (!replySection) {
-        return;
-      }
-      
-      if (!replies || replies.length === 0) {
-        replySection.innerHTML = '';
-        return;
-      }
-      
-      replySection.innerHTML = '';
-      replies.forEach(reply => {
-        const replyDiv = document.createElement('div');
-        replyDiv.className = 'reply-item';
-        replyDiv.id = `reply-${reply.replyId}`;
+
+    function renderPagination(current, total) {
+        const pagination = document.getElementById('pagination');
+        pagination.innerHTML = '';
         
-        const isOwner = currentLoginId && reply.loginId === currentLoginId;
-        
-        let html = `
-          <div style="margin-bottom:5px;">
-            <strong style="font-size:13px;">${escapeHtml(reply.loginId || reply.userId || '알 수 없음')}</strong>
-            <small style="color:#999; font-size:11px; margin-left:5px;">${new Date(reply.createdAt).toLocaleString('ko-KR')}</small>
-        `;
-        
-        if (isOwner) {
-          html += `
-            <button onclick="editReply('${reply.replyId}')" style="margin-left:5px; font-size:11px; padding:2px 5px;">수정</button>
-            <button onclick="deleteReply('${reply.replyId}', '${commentId}')" style="margin-left:3px; font-size:11px; padding:2px 5px;">삭제</button>
-          `;
+        if (total <= 1) return;
+
+        // [이전] 버튼
+        if (current > 1) {
+            const prevBtn = document.createElement('button');
+            prevBtn.textContent = '이전';
+            prevBtn.className = 'page-btn';
+            prevBtn.onclick = () => loadComments(current - 1);
+            pagination.appendChild(prevBtn);
         }
+
+        // 페이지 번호 버튼 (최대 5개 표시 로직)
+        let startPage = Math.max(1, current - 2);
+        let endPage = Math.min(total, current + 2);
         
-        html += `
-          </div>
-          <div id="reply-content-${reply.replyId}" style="font-size:13px; color:#333; margin-top:3px;">
-            ${escapeHtml(reply.content || '')}
-          </div>
-        `;
-        
-        replyDiv.innerHTML = html;
-        replySection.appendChild(replyDiv);
-        
-        if (isOwner) {
-          const editBtn = replyDiv.querySelector(`button[onclick*="editReply('${reply.replyId}')"]`);
-          if (editBtn) {
-            editBtn.dataset.content = reply.content;
-          }
+        if (endPage - startPage < 4) {
+            if (startPage === 1) endPage = Math.min(total, startPage + 4);
+            else if (endPage === total) startPage = Math.max(1, endPage - 4);
         }
-      });
-    }
-    
-    function toggleReplyForm(commentId) {
-      const form = document.getElementById(`reply-form-${commentId}`);
-      if (form) {
-        form.classList.toggle('active');
-        if (form.classList.contains('active')) {
-          document.getElementById(`reply-input-${commentId}`).focus();
+
+        for (let i = startPage; i <= endPage; i++) {
+            const btn = document.createElement('button');
+            btn.textContent = i;
+            btn.className = 'page-btn' + (i === current ? ' active' : '');
+            btn.onclick = () => loadComments(i);
+            pagination.appendChild(btn);
         }
-      }
+
+        // [다음] 버튼
+        if (current < total) {
+            const nextBtn = document.createElement('button');
+            nextBtn.textContent = '다음';
+            nextBtn.className = 'page-btn';
+            nextBtn.onclick = () => loadComments(current + 1);
+            pagination.appendChild(nextBtn);
+        }
     }
-    
-    async function submitReply(commentId) {
-      const input = document.getElementById(`reply-input-${commentId}`);
-      const content = input.value.trim();
-      
-      if (!content) {
-        alert('답글 내용을 입력해주세요.');
-        return;
-      }
-      
-      try {
-        await axios.post(`/api/comments/${commentId}/replies`, {
-          content: content
+
+    function displayItems(items) {
+        const container = document.getElementById('commentList');
+        container.innerHTML = '';
+        
+        if (!items || items.length === 0) {
+            container.innerHTML = '<div style="color:#999; text-align:center;">아직 댓글이 없습니다.</div>';
+            return;
+        }
+
+        items.forEach(item => {
+            const div = document.createElement('div');
+            const isOwner = currentLoginId && item.loginId === currentLoginId;
+            
+            if (item.type === 'COMMENT') {
+                div.className = 'comment-item';
+                div.id = `comment-${item.id}`;
+            } else {
+                div.className = 'reply-item';
+                div.id = `reply-${item.id}`;
+            }
+
+            let html = `
+                <div style="display:flex; justify-content:space-between;">
+                    <div>
+                        <strong>${escapeHtml(item.loginId || '알 수 없음')}</strong>
+                        <small style="color:#999; margin-left:5px;">${new Date(item.createdAt).toLocaleString('ko-KR')}</small>
+                    </div>
+            `;
+            
+            if (isOwner) {
+                const typeStr = item.type === 'COMMENT' ? 'Comment' : 'Reply';
+                html += `
+                    <div>
+                        <button onclick="edit${typeStr}('${item.id}')" style="font-size:11px;">수정</button>
+                        <button onclick="delete${typeStr}('${item.id}')" style="font-size:11px;">삭제</button>
+                    </div>
+                `;
+            }
+            html += `</div>`;
+            html += `<div style="margin-top:5px;">${escapeHtml(item.content)}</div>`;
+            
+            if (item.type === 'COMMENT') {
+                html += `
+                    <div style="font-size:12px; color:#666; margin-top:5px;">
+                        좋아요: ${item.likeCount}
+                        ${currentLoginId ? `<button onclick="toggleReplyForm('${item.id}')" style="margin-left:10px;">답글달기</button>` : ''}
+                    </div>
+                    <div class="reply-form" id="reply-form-${item.id}">
+                        <textarea id="reply-input-${item.id}" placeholder="답글 내용" style="width:90%; height:50px;"></textarea>
+                        <button onclick="submitReply('${item.id}')" style="margin-top:3px;">등록</button>
+                        <button onclick="toggleReplyForm('${item.id}')">취소</button>
+                    </div>
+                `;
+            }
+            div.innerHTML = html;
+            
+            if (isOwner) {
+                const editBtn = div.querySelector('button');
+                if(editBtn) editBtn.dataset.content = item.content;
+            }
+            container.appendChild(div);
         });
-        input.value = '';
-        toggleReplyForm(commentId);
-        // 약간의 지연 후 답글 목록 새로고침
-        setTimeout(() => {
-          loadReplies(commentId);
-        }, 300);
-      } catch (error) {
-        alert(error.response?.data || '답글 등록에 실패했습니다.');
-      }
     }
-    
-    async function editReply(replyId) {
-      const replyDiv = document.getElementById(`reply-${replyId}`);
-      if (!replyDiv) return;
-      
-      const editBtn = replyDiv.querySelector(`button[onclick*="editReply('${replyId}')"]`);
-      const currentContent = editBtn ? editBtn.dataset.content : '';
-      
-      const newContent = prompt('답글을 수정하세요:', currentContent);
-      if (newContent === null || newContent.trim() === '') {
-        return;
-      }
-      
-      try {
-        const response = await axios.put(`/api/comments/replies/${replyId}`, {
-          content: newContent.trim()
-        });
-        alert(response.data);
-        const commentId = replyDiv.closest('.comment-item').id.replace('comment-', '');
-        loadReplies(commentId);
-      } catch (error) {
-        console.error('답글 수정 실패:', error);
-        alert(error.response?.data || '답글 수정에 실패했습니다.');
-      }
+
+    function toggleReplyForm(id) { const el = document.getElementById(`reply-form-${id}`); if(el) el.classList.toggle('active'); }
+    async function submitReply(id) {
+        const input = document.getElementById(`reply-input-${id}`);
+        if(!input.value.trim()) { alert('내용 입력'); return; }
+        try { await axios.post(`/api/comments/${id}/replies`, { content: input.value }); location.reload(); }
+        catch(e) { alert('실패'); }
     }
-    
-    async function deleteReply(replyId, commentId) {
-      if (!confirm('정말 삭제하시겠습니까?')) {
-        return;
-      }
-      
-      try {
-        const response = await axios.delete(`/api/comments/replies/${replyId}`);
-        alert(response.data);
-        loadReplies(commentId);
-      } catch (error) {
-        console.error('답글 삭제 실패:', error);
-        alert(error.response?.data || '답글 삭제에 실패했습니다.');
-      }
+    async function editComment(id) {
+        const val = prompt('수정:'); if(!val) return;
+        try { await axios.put(`/api/comments/${id}`, { content: val }); loadComments(currentPage); } catch(e) { alert('실패'); }
     }
-    
-    function escapeHtml(text) {
-      const div = document.createElement('div');
-      div.textContent = text;
-      return div.innerHTML;
+    async function deleteComment(id) {
+        if(!confirm('삭제?')) return;
+        try { await axios.delete(`/api/comments/${id}`); loadComments(currentPage); } catch(e) { alert('실패'); }
     }
-    
-    async function editComment(commentId) {
-      const commentDiv = document.getElementById(`comment-${commentId}`);
-      if (!commentDiv) return;
-      
-      const editBtn = commentDiv.querySelector(`button[onclick*="editComment('${commentId}')"]`);
-      const currentContent = editBtn ? editBtn.dataset.content : '';
-      
-      const newContent = prompt('댓글을 수정하세요:', currentContent);
-      if (newContent === null || newContent.trim() === '') {
-        return;
-      }
-      
-      try {
-        const response = await axios.put(`/api/comments/${commentId}`, {
-          content: newContent.trim()
-        });
-        alert(response.data);
-        loadComments();
-      } catch (error) {
-        console.error('댓글 수정 실패:', error);
-        const errorMsg = error.response?.data || '댓글 수정에 실패했습니다.';
-        alert(errorMsg);
-      }
+    async function editReply(id) {
+        const val = prompt('수정:'); if(!val) return;
+        try { await axios.put(`/api/comments/replies/${id}`, { content: val }); loadComments(currentPage); } catch(e) { alert('실패'); }
     }
-    
-    async function deleteComment(commentId) {
-      if (!confirm('정말 삭제하시겠습니까?')) {
-        return;
-      }
-      
-      try {
-        const response = await axios.delete(`/api/comments/${commentId}`);
-        alert(response.data);
-        loadComments();
-      } catch (error) {
-        console.error('댓글 삭제 실패:', error);
-        const errorMsg = error.response?.data || '댓글 삭제에 실패했습니다.';
-        alert(errorMsg);
-      }
+    async function deleteReply(id) {
+        if(!confirm('삭제?')) return;
+        try { await axios.delete(`/api/comments/replies/${id}`); loadComments(currentPage); } catch(e) { alert('실패'); }
     }
+    function escapeHtml(text) { const div = document.createElement('div'); div.textContent = text; return div.innerHTML; }
     /*]]>*/
-  </script>
+    </script>
 </body>
 </html>

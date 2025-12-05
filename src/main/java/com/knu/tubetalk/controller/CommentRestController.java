@@ -1,5 +1,7 @@
 package com.knu.tubetalk.controller;
 
+import com.knu.tubetalk.dto.CommentView;
+import com.knu.tubetalk.dto.PageResponse;
 import com.knu.tubetalk.domain.Reply;
 import com.knu.tubetalk.domain.User;
 import com.knu.tubetalk.domain.UserComment;
@@ -34,9 +36,12 @@ public class CommentRestController {
     }
 
     @GetMapping("/thread/{threadId}")
-    public ResponseEntity<List<UserComment>> getCommentsByThread(@PathVariable String threadId) {
+    public ResponseEntity<PageResponse<CommentView>> getCommentsByThread(
+            @PathVariable String threadId,
+            @RequestParam(defaultValue = "1") int page) {
         try {
-            return ResponseEntity.ok(commentService.getCommentsByThread(threadId));
+            int size = 50; // 페이지당 50개 (댓글 + 답글 합쳐서)
+            return ResponseEntity.ok(commentService.getCommentsWithReplies(threadId, page, size));
         } catch (SQLException e) {
             e.printStackTrace();
             return ResponseEntity.internalServerError().build();

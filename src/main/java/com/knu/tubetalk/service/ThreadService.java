@@ -2,6 +2,7 @@ package com.knu.tubetalk.service;
 
 import java.sql.SQLException;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 import org.springframework.stereotype.Service;
@@ -10,6 +11,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.knu.tubetalk.dao.ChannelDao;
 import com.knu.tubetalk.dao.ThreadDao;
 import com.knu.tubetalk.dao.VideoDao;
+import com.knu.tubetalk.dto.TrendingThread;
 import com.knu.tubetalk.domain.Channel;
 import com.knu.tubetalk.domain.ThreadEntity;
 import com.knu.tubetalk.domain.Video;
@@ -64,5 +66,11 @@ public class ThreadService {
 
         public Video getVideo() { return video; }
         public ThreadEntity getThread() { return thread; }
+    }
+    
+    public List<TrendingThread> getTrendingThreads() throws SQLException {
+        // 현재 시간으로부터 24시간 전 계산
+        LocalDateTime yesterday = LocalDateTime.now().minusDays(1);
+        return threadDao.findTrending(yesterday);
     }
 }

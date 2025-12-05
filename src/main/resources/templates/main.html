@@ -4,47 +4,85 @@
 <head>
     <meta charset="UTF-8">
     <title>Main</title>
+    <style>
+        /* 레이아웃 스타일 추가 */
+        .container {
+            display: flex;
+            height: 80vh; /* 화면 높이 사용 */
+        }
+        .main-content {
+            flex: 3; /* 화면의 3/4 차지 */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+        .side-panel {
+            flex: 1; /* 화면의 1/4 차지 */
+            border-left: 1px solid #ddd;
+            padding: 20px;
+            background-color: #f9f9f9;
+        }
+        .rank-item {
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #eee;
+        }
+        .rank-title {
+            font-weight: bold;
+            font-size: 14px;
+            text-decoration: none;
+            color: #333;
+            display: block; /* 줄바꿈 */
+        }
+        .rank-stats {
+            font-size: 12px;
+            color: #ff5722;
+        }
+    </style>
 </head>
 <body>
 
-<!-- 상단 네비게이션 -->
 <div style="display:flex; justify-content:flex-end; padding:20px;">
     <div>
-        <!-- 비로그인 사용자 -->
         <a sec:authorize="isAnonymous()" href="/login">Login</a>
-
-        <!-- 로그인 사용자 -->
         <a sec:authorize="isAuthenticated()" href="/logout">Logout</a>
-        <a sec:authorize="isAuthenticated()" th:href="@{/guestbook(userId=${#authentication.name})}" href="/guestbook">내 방명록</a>
+        <a sec:authorize="isAuthenticated()" th:href="@{/guestbook(loginId=${#authentication.name})}" href="/guestbook">내 방명록</a>
+        <a sec:authorize="isAuthenticated()" href="/userInfoChange" style="margin-left:10px;">정보수정</a>
     </div>
 </div>
 
+<div class="container">
+    <div class="main-content">
+        <h2>Search</h2>
+        
+        <div th:if="${errorMessage}" style="color:red; margin-bottom:20px;">
+            <span th:text="${errorMessage}"></span>
+        </div>
+        
+        <input id="searchInput" type="text" placeholder="Enter keyword or VideoID"
+               style="width:400px; height:40px; font-size:18px; padding:5px;">
 
-
-<!-- 중앙 검색창 영역 -->
-<div style="display:flex; flex-direction:column; align-items:center; margin-top:150px;">
-
-    <h2>Search</h2>
-    
-    <!-- 에러 메시지 표시 -->
-    <div th:if="${errorMessage}" style="color:red; margin-bottom:20px; padding:10px; border:1px solid red; border-radius:5px; max-width:500px; text-align:center;">
-        <span th:text="${errorMessage}"></span>
+        <button onclick="performSearch()" style="margin-top:20px; width:150px; height:40px; font-size:16px;">
+            Search
+        </button>
     </div>
-    <div th:if="${param.error}" style="color:red; margin-bottom:20px; padding:10px; border:1px solid red; border-radius:5px; max-width:500px; text-align:center;">
-        <span th:if="${param.error == 'invalid_video'}">존재하지 않는 비디오 ID입니다.</span>
-        <span th:if="${param.error == 'db_error'}">데이터베이스 오류가 발생했습니다.</span>
-        <span th:if="${param.error == 'unknown'}">오류가 발생했습니다. 다시 시도해주세요.</span>
+
+    <div class="side-panel">
+        <h3>🔥 지금 뜨는 토론</h3>
+        <p style="font-size:12px; color:gray;">(최근 24시간 댓글 기준)</p>
+        
+        <div th:if="${#lists.isEmpty(trending)}">
+            <p>데이터가 없습니다.</p>
+        </div>
+
+        <div th:each="item, stat : ${trending}" class="rank-item">
+            <a th:href="@{'/thread?v=' + ${item.videoId}}" class="rank-title">
+                <span th:text="${stat.count} + '. ' + ${item.title}">1. 제목</span>
+            </a>
+            <span class="rank-stats">💬 댓글 <span th:text="${item.commentCount}">0</span>개</span>
+        </div>
     </div>
-
-    <input id="searchInput"
-           type="text"
-           placeholder="Enter keyword or VideoID"
-           style="width:400px; height:40px; font-size:18px; padding:5px;">
-
-    <button onclick="performSearch()"
-            style="margin-top:20px; width:150px; height:40px; font-size:16px;">
-        Search
-    </button>
 </div>
 
 <script>

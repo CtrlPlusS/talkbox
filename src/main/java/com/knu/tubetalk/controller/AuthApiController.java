@@ -1,12 +1,15 @@
 package com.knu.tubetalk.controller;
 
 import java.sql.SQLException;
+import java.security.Principal;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.ui.Model;
 // ...
 
+import com.knu.tubetalk.domain.User;
 import com.knu.tubetalk.dto.JoinRequest;
 import com.knu.tubetalk.service.UserService;
 
@@ -44,6 +47,45 @@ public class AuthApiController {
 
         } catch (IllegalArgumentException e) {
             return "redirect:/delete?error=not_found";
+        }
+    }
+    
+    @GetMapping("/update")
+    public String updatePage(Model model, Principal principal) {
+        if (principal == null) {
+            return "redirect:/login";
+        }
+        
+        // 1. 로그인한 아이디로 회원 정보 가져오기
+        String loginId = principal.getName();
+        User user;
+        try {
+        	user = userService.loadUserByLoginId(loginId);
+        } catch(SQLException E) {
+        	return "redirect:/delete?error=db_error";
+        }
+        
+        // 2. 모델에 "user"라는 이름으로 담기 (이게 있어야 HTML에서 ${user}를 쓸 수 있음)
+        model.addAttribute("user", user);
+        
+        return "update"; // update.html로 이동
+    }
+    
+    @PutMapping("/api/user/update")
+    public ResponseEntity<String> updateUserInfo(
+            @RequestBody JoinRequest dto,
+            @AuthenticationPrincipal org.springframework.security.core.userdetails.User principal) {
+        
+        // 보안 검사: 로그인한 사람과 수정하려는 ID가 같은지 확인
+        if (!principal.getUsername().equals(dto.getLoginId())) {
+            return ResponseEntity.status(403).body("본인의 정보만 수정할 수 있습니다.");
+        }
+
+        try {
+            userService.updateUser(dto);
+            return ResponseEntity.ok("회원정보가 성공적으로 수정되었습니다.");
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("정보 수정 실패: " + e.getMessage());
         }
     }
 }

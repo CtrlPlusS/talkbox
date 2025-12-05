@@ -51,6 +51,23 @@ public class UserService {
         Guestbook newGuestbook = new Guestbook(userId, LocalDateTime.now());
         guestbookDao.save(newGuestbook);
     }
+    
+    public void updateUser(JoinRequest dto) throws SQLException {
+        // 1. 아이디로 기존 회원 정보 찾기
+        User user = userDao.findByLoginId(dto.getLoginId())
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 사용자입니다."));
+
+        // 2. 정보 변경 (이메일 변경)
+        user.setEmail(dto.getEmail());
+
+        // 3. 비밀번호 변경 (새 비밀번호가 입력된 경우에만 암호화해서 변경)
+        if (dto.getPassword() != null && !dto.getPassword().isBlank()) {
+            user.setPassword(passwordEncoder.encode(dto.getPassword()));
+        }
+
+        // 4. DB 업데이트 실행
+        userDao.update(user);
+    }
 
     public User loadUserByLoginId(String loginId) throws SQLException {
         return userDao.findByLoginId(loginId).orElse(null);
@@ -68,6 +85,5 @@ public class UserService {
         // 2. 로드된 User_id로 삭제를 진행합니다.
         userDao.deleteByUserId(user.getUserId());
     }
-    
     
 }

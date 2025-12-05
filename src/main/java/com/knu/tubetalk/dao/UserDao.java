@@ -82,6 +82,19 @@ public class UserDao {
 			ps.executeUpdate();
 		}
 	}
+	
+	public void update(User user) throws SQLException {
+	    String sql = "UPDATE APP_USER SET Email = ?, Password = ? WHERE User_id = ?";
+	    try (Connection conn = dataSource.getConnection();
+	         PreparedStatement ps = conn.prepareStatement(sql)) {
+
+	        ps.setString(1, user.getEmail());
+	        ps.setString(2, user.getPassword());
+	        ps.setString(3, user.getUserId());
+	        
+	        ps.executeUpdate();
+	    }
+	}
 
 	public void deleteByUserId(String userId) throws SQLException {
 		String sql = "DELETE FROM APP_USER WHERE User_id = ?";
